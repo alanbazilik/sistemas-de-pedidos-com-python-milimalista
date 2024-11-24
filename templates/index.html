@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Pedidos</title>
+    <link rel="stylesheet" href="/static/style.css">
+
+</head>
+
+<body>
+    <!-- Menu de Produtos -->
+    <div id="product-container">
+        <h1>Cardápio</h1>
+        <div id="items"></div>
+    </div>
+
+    <!-- Janelas de Pedidos -->
+    <div id="order-containers">
+        <div class="order-container" id="order-1">
+            <h2>Pedido 1</h2>
+            <input type="text" class="customer-name" placeholder="Nome do Cliente" id="customer-name-1">
+            <div class="order-list"></div>
+            <button class="generate" onclick="generateExcel(0)">Concluir Pedido</button>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Sistema de Pedidos. Todos os direitos reservados.</p>
+    </footer>
+
+    <script>
+        const API_URL = "http://127.0.0.1:5000";
+        const orders = [
+            [],
+            [],
+            []
+        ];
+
+        async function loadItems() {
+            const response = await fetch(`${API_URL}/items`);
+            const items = await response.json();
+            const itemsDiv = document.getElementById("items");
+
+            items.forEach(item => {
+                const itemDiv = document.createElement("div");
+                itemDiv.className = "item";
+                itemDiv.innerHTML = `
+                    <img src="/static/${item.image}" alt="${item.name}">
+                    <span>${item.name} - R$ ${item.price.toFixed(2)}</span>
+                `;
+
+                itemDiv.onclick = () => addItemToOrder(item);
+                itemsDiv.appendChild(itemDiv);
+            });
+        }
+
+        function addItemToOrder(item) {
+            const orderIndex = prompt("Digite o número do pedido para adicionar este item (1):");
+            if (orderIndex >= 1 && orderIndex <= 3) {
+                const index = orderIndex - 1;
+                orders[index].push(item);
+                updateOrderList(index);
+            } else {
+                alert("Número de pedido inválido!");
+            }
+        }
+
+        function updateOrderList(index) {
+            const orderList = document.querySelectorAll(".order-list")[index];
+            orderList.innerHTML = "";
+
+            let total = 0;
+            orders[index].forEach((order, i) => {
+                total += order.price;
+                const orderItemDiv = document.createElement("div");
+                orderItemDiv.className = "order-item";
+                orderItemDiv.innerHTML = `
+                    ${order.name} - R$ ${order.price.toFixed(2)}
+                    <button onclick="removeOrder(${index}, ${i})">Remover</button>
+                `;
+                orderList.appendChild(orderItemDiv);
+            });
+
+            const totalDiv = document.createElement("div");
+            totalDiv.innerHTML = `<strong>Total: R$ ${total.toFixed(2)}</strong>`;
+            orderList.appendChild(totalDiv);
+        }
+
+        function removeOrder(orderIndex, itemIndex) {
+            orders[orderIndex].splice(itemIndex, 1);
+            updateOrderList(orderIndex);
+        }
+
+        async function generateExcel(index) {
+            const customerName = document.getElementById(`customer-name-${index + 1}`).value;
+            if (!customerName) {
+                alert("Por favor, insira o nome do cliente!");
+                return;
+            }
+            if (orders[index].length === 0) {
+                alert("Nenhum item no pedido!");
+                return;
+            }
+
+            const response = await fetch(`${API_URL}/generate_excel`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    customer: customerName,
+                    orders: orders[index]
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const fileLink = `${API_URL}/uploads/${data.file}`;
+                window.location.href = fileLink; // Inicia o download automaticamente
+            } else {
+                alert("Erro ao gerar o arquivo Excel.");
+            }
+        }
+
+
+        loadItems();
+    </script>
+</body>
+
+</html>
